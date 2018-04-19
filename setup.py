@@ -9,7 +9,7 @@ with open('requirements.txt') as f:
 
 setup(name='familyapp.py',
       author='Piotr Giedziun',
-      version='0.0.10',
+      version='0.0.12',
       packages=['familyapp',],
       license='MIT',
       author_email='piotrgiedziun@gmail.com',

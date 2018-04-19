@@ -149,7 +149,7 @@ class Bot(object):
         """send textual message"""
         return self._request(
             'POST',
-            'bot_api/v1/families/%d/conversations/%d/messages' % (family_id, conversation_id),
+            'bot_api/v1/families/%s/conversations/%s/messages' % (family_id, conversation_id),
             data={
                 'content': message,
                 'template_attributes': template.as_dict() if template else None,
