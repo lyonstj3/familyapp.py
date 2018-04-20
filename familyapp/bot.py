@@ -40,15 +40,19 @@ class Button(object):
 
     @property
     def type(self):
-        return 'postback' if self.payload else ':web_url'
+        return 'postback' if self.payload else 'web_url'
 
     def as_dict(self):
-        return {
+        opts = {
             'title': self.title, 
-            'payload': self.payload, 
-            'url': self.web_url, 
             'button_type': self.type
         }
+        if self.payload:
+            opts['payload'] = self.payload
+        if self.web_url:
+            opts['url'] = self.web_url
+
+        return opts
 
 
 class Element(object):
@@ -75,28 +79,35 @@ class Element(object):
 
 
 class Template(object):
-    def __init__(self, buttons=None, elements=None, template_type='buttons'):
+    def __init__(self, buttons=None, carousel=None, elements=None, template_type='buttons'):
         """Builder for template object
 
         :param buttons: List of ButtonAttributes (optional)
         :type buttons: list
-        :param elements: List of ElementAttributes (optional)
-        :type elements: list
         :param template_type: Type of template ('buttons' or 'list') (optional)
         :type str
         """
         self.template_type = template_type
         self.buttons = buttons if buttons else []
+        self.carousel = carousel if carousel else []
         self.elements = elements if elements else []
 
     def as_dict(self):
         buttons = [x.as_dict() for x in self.buttons]
+        carousel = [x.as_dict() for x in self.carousel]
         elements = [x.as_dict() for x in self.elements]
-        return {
-            'buttons_attributes': buttons, 
-            'elements_attributes': elements, 
+        opts = {
             'template_type': self.template_type
         }
+
+        if buttons:
+            opts['buttons'] = buttons
+        if carousel:
+            opts['carousel'] = carousel
+        if elements:
+            opts['list'] = elements
+
+        return opts
 
 
 class Bot(object):
