@@ -1,4 +1,5 @@
 import requests
+import json
 
 
 class APIException(Exception):
@@ -115,7 +116,7 @@ class Bot(object):
         self._handlers = {}
         self.token = token
         self.verify_token = verify_token
-        self.url = kwargs.get('url', 'https://api.familyapp.io/')
+        self.url = kwargs.get('url', 'https://api.familyapp.com/')
 
     def _request(self, method, suffix_url, data):
         if method.lower() not in ['get', 'post', 'patch']:
@@ -124,7 +125,7 @@ class Bot(object):
             )
 
         headers = {
-            'User-Agent': 'familyapp.py/0.0.11', 
+            'User-Agent': 'familyapp.py/0.0.14', 
             'Authorization': self.token
             }
         r = getattr(requests, method.lower())(
@@ -163,7 +164,7 @@ class Bot(object):
             'bot_api/v1/families/%s/conversations/%s/messages' % (family_id, conversation_id),
             data={
                 'content': message,
-                'template_attributes': template.as_dict() if template else None,
+                'template': json.dumps(template.as_dict()) if template else None,
                 'quick_replies_attributes': quick_replies,
                 'audio_remote_url': audio_remote_url,
                 'photo': photo_base64,
