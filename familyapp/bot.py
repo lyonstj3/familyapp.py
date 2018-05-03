@@ -171,6 +171,19 @@ class Bot(object):
             }
         )
 
+    def get_conversations(self, family_id):
+        """get all conversation data for family
+
+        :param family_id:
+        :type family_id: int
+        :return:
+        """
+        return self._request(
+            'GET',
+            'bot_api/v1/families/%d/conversations' % (family_id),
+        )
+    
+
     def get_conversation(self, family_id, conversation_id):
         """get conversation data
 
@@ -211,6 +224,7 @@ class Bot(object):
             'GET',
             'bot_api/v1/families/%d/conversations/%d' % (family_id, conversation_id),
         )
+
 
     def create_conversation(self, family_id, title):
         """create conversation
