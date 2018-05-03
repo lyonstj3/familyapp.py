@@ -1,4 +1,5 @@
 import requests
+import json
 
 
 class APIException(Exception):
@@ -7,9 +8,9 @@ class APIException(Exception):
         self.status_code = status_code
 
 
-class QuickReplay(object):
+class QuickReply(object):
     def __init__(self, title, payload=None):
-        """Quick Replay
+        """Quick Reply
 
         :param title: text of the button (required)
         :type title: str
@@ -40,10 +41,19 @@ class Button(object):
 
     @property
     def type(self):
-        return 'postback' if self.payload else ':web_url'
+        return 'postback' if self.payload else 'web_url'
 
     def as_dict(self):
-        return {'title': self.title, 'payload': self.payload, 'url': self.web_url, 'button_type': self.type}
+        opts = {
+            'title': self.title, 
+            'button_type': self.type
+        }
+        if self.payload:
+            opts['payload'] = self.payload
+        if self.web_url:
+            opts['url'] = self.web_url
+
+        return opts
 
 
 class Element(object):
@@ -62,28 +72,43 @@ class Element(object):
         self.image = image
 
     def as_dict(self):
-        return {'title': self.title, 'subtitle': self.subtitle, 'image': self.image}
+        return {
+            'title': self.title, 
+            'subtitle': self.subtitle, 
+            'image': self.image
+        }
 
 
 class Template(object):
-    def __init__(self, buttons=None, elements=None, template_type='buttons'):
+    def __init__(self, buttons=None, carousel=None, elements=None, template_type='buttons'):
         """Builder for template object
 
         :param buttons: List of ButtonAttributes (optional)
         :type buttons: list
-        :param elements: List ob ElementAttributes (optional)
-        :type elements: list
         :param template_type: Type of template ('buttons' or 'list') (optional)
         :type str
         """
         self.template_type = template_type
         self.buttons = buttons if buttons else []
+        self.carousel = carousel if carousel else []
         self.elements = elements if elements else []
 
     def as_dict(self):
         buttons = [x.as_dict() for x in self.buttons]
+        carousel = [x.as_dict() for x in self.carousel]
         elements = [x.as_dict() for x in self.elements]
-        return {'buttons_attributes': buttons, 'elements_attributes': elements, 'template_type': self.template_type}
+        opts = {
+            'template_type': self.template_type
+        }
+
+        if buttons:
+            opts['buttons'] = buttons
+        if carousel:
+            opts['carousel'] = carousel
+        if elements:
+            opts['list'] = elements
+
+        return opts
 
 
 class Bot(object):
@@ -91,21 +116,28 @@ class Bot(object):
         self._handlers = {}
         self.token = token
         self.verify_token = verify_token
-        self.url = kwargs.get('url', 'https://api.familyapp.io/')
+        self.url = kwargs.get('url', 'https://api.familyapp.com/')
 
     def _request(self, method, suffix_url, data):
         if method.lower() not in ['get', 'post', 'patch']:
-            raise APIException("Invalid method type, only [get, post, patch] is supported")
+            raise APIException(
+                "Invalid method type, only [get, post, patch] is supported"
+            )
 
-        headers = {'User-Agent': 'familyapp.py/0.0.6', 'Authorization': self.token}
-        r = getattr(requests, method.lower())(self.url + suffix_url, json=data, headers=headers)
+        headers = {
+            'User-Agent': 'familyapp.py/0.0.14', 
+            'Authorization': self.token
+            }
+        r = getattr(requests, method.lower())(
+                self.url + suffix_url, json=data, headers=headers, verify=False
+            )
         if r.status_code in [200, 201]:
             return r.json()
 
         raise APIException(r.text, status_code=r.status_code)
 
-    def send_message(self, family_id, conversation_id, message, quick_replies=None, template=None,
-                     audio_remote_url=None, photo_base64=None):
+    def send_message(self, family_id, conversation_id, message, quick_replies=None, 
+                    template=None, audio_remote_url=None, photo_base64=None):
         """send message to selected conversation
 
         :param family_id: ID of selected family (required)
@@ -114,7 +146,7 @@ class Bot(object):
         :type conversation_id: int
         :param message: content of the message (optional)
         :type message: str
-        :param quick_replies: list of QuickReplay (optional)
+        :param quick_replies: list of QuickReply (optional)
         :type quick_replies: list
         :param template: Template object
         :type Template
@@ -129,18 +161,75 @@ class Bot(object):
         """send textual message"""
         return self._request(
             'POST',
-            'bot_api/v1/families/%d/conversations/%d/messages' % (family_id, conversation_id),
+            'bot_api/v1/families/%s/conversations/%s/messages' % (family_id, conversation_id),
             data={
                 'content': message,
-                'template_attributes': template.as_dict() if template else None,
+                'template': json.dumps(template.as_dict()) if template else None,
                 'quick_replies_attributes': quick_replies,
                 'audio_remote_url': audio_remote_url,
                 'photo': photo_base64,
             }
         )
 
-    def update_family_user(self, family_id, user_id, username=None, phone_number=None, email=None, birthday=None,
-                           photo=None, photo_remote_url=None):
+    def get_conversation(self, family_id, conversation_id):
+        """get conversation data
+
+        {
+            "id": 1,
+            "channel_id": 10,
+            "family_users": [
+                {
+                    "id": 1,
+                    "username": "John",
+                    "photo_url": "",
+                    "photo_medium_url": "",
+                    "email": "support@familyapp.net",
+                    "phone_number: "+100000000",
+                    "admin": false,
+                    "child_account": true
+                },
+                {
+                    "id": 2,
+                    "username": "Bob",
+                    "photo_url": "",
+                    "photo_medium_url": "",
+                    "email": "bob@familyapp.net",
+                    "phone_number: "+100000002",
+                    "admin": true,
+                    "child_account": false
+                }
+            ]
+        }
+
+        :param family_id:
+        :type family_id: int
+        :param conversation_id:
+        :type conversation_id: int
+        :return:
+        """
+        return self._request(
+            'GET',
+            'bot_api/v1/families/%d/conversations/%d' % (family_id, conversation_id),
+        )
+
+    def create_conversation(self, family_id, title):
+        """create conversation
+
+        :param family_id: ID of selected family (required)
+        :type family_id: int
+        :param title:
+        :type title: str
+        """
+        return self._request(
+            'POST',
+            'bot_api/v1/families/%d/conversations' % (family_id),
+            data={
+                'title': title,
+            }
+        )
+
+    def update_family_user(self, family_id, user_id, username=None, phone_number=None, 
+                           email=None, birthday=None, photo=None, photo_remote_url=None):
         """update family member profile
 
         :param family_id: ID of selected family (required)
@@ -189,6 +278,100 @@ class Bot(object):
                 'photo': photo,
             }
         )
+    
+    def create_event(self, family_id, title, description, start_time, end_time):
+        """create event in family calendar
+
+        :param family_id: ID of selected family (required)
+        :type family_id: int
+        :param title: title of event (required)
+        :type title: str
+        :param description: description of event
+        :type description: str
+        :param start_time: start date of event, formatted as MM.DD.YYYY (required)
+        :type start_time: datetime
+        :param end_time: end date of event, formatted as MM.DD.YYYY (required)
+        :type end_time: datetime
+        :param recurring: formatted with RRULE recurring event format (optional)
+        :type recurring: str
+        :param family_user_ids
+        :type family_user_ids: list
+        :return: request object
+        """
+        return self._request(
+            'POST',
+            'bot_api/v1/families/%d/events' % (family_id),
+            data={
+                'title': title,
+                'description': description,
+                'start_time': start_time,
+                'end_time': end_time,
+                'recurring': recurring,
+                'family_user_ids': family_user_ids
+            }
+        )
+    
+    def update_persistent_menu(self, persistent_menu):
+        """update peristant menu
+
+        {
+            "persistent_menu": [
+                {
+                    "locale": "default",
+                    "composer_input_disabled": false,
+                    "call_to_actions": [
+                        {
+                            "title": "WP",
+                            "type": "web_url",
+                            "url": "http://www.wp.pl"
+                        },
+                        {
+                            "title": "Actions",
+                            "type": "nested",
+                            "call_to_actions": [
+                                {
+                                    "title": "Quick Replies",
+                                    "type": "postback",
+                                    "payload": "QUICK"
+                                },
+                                {
+                                    "title": "Template Buttons",
+                                    "type": "postback",
+                                    "payload": "BUTTONS"
+                                },
+                                {
+                                    "title": "Template List",
+                                    "type": "postback",
+                                    "payload": "LIST"
+                                },
+                                {
+                                    "title": "Template Carousel",
+                                    "type": "postback",
+                                    "payload": "CAROUSEL"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+
+        :param persistent_menu:
+        :type persistent_menu: json
+        """
+        return self._request(
+            'PATCH',
+            'bot_api/v1/bot',
+            data={
+                'persistent_menu': persistent_menu
+            }
+        )
+    
+    def handle_channel_added(self, callback):
+        """triggered when family adds channel
+        READ MORE: https://familyappbot.docs.apiary.io/#introduction/webhooks/4.-receive-messages
+        """
+        self._handlers['add_channel_to_family'] = callback
 
     def handle_message(self, callback):
         """triggered when new messages has been sent
@@ -212,14 +395,17 @@ class Bot(object):
         """parse incoming requests"""
         if not headers:
             headers = {}
+
         verify_token = headers.get('Authorization', None)
-        event = json_payload.get('event_key', None)
+        event = json_payload.get('event_type', None)
 
         if verify_token != self.verify_token:
             raise Exception("Invalid verify_token")
 
-        if not event in self._handlers:
-            raise Exception("You have to define @familyapp.parse_request")
+        if event not in self._handlers:
+            raise Exception("Event type ({}) is not handled".format(event))
 
-        del json_payload['event_key']
-        self._handlers[event](json_payload)
+        if 'event_data' not in json_payload:
+            raise Exception("Invalid JSON payload")
+
+        self._handlers[event](json_payload['event_data'])
